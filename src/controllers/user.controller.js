@@ -1,10 +1,10 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uplaodOnCloudinary} from "../utils/cloudinary.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-const registerUser = asyncHandler( async (req,res) =>{
+const registerUser = asyncHandler( async (req,res,next) =>{
     // get user details from frontend
     // validation - not empty 
     // check if user alredy exists - email, username
@@ -15,7 +15,7 @@ const registerUser = asyncHandler( async (req,res) =>{
     // check for user creation
     // return response
 
-    const { username, email, fullName, password } = req.body
+    const { fullname, username, email, password } = req.body
     console.log("email:", email);
 
     // if(fullName === ""){
@@ -23,19 +23,21 @@ const registerUser = asyncHandler( async (req,res) =>{
     // }
 
     if(
-        [username,email,fullName,password].some((field) => 
+        [fullname, username, email, password].some((field) => 
         field?.trim() === "")
     ){
         throw new ApiError(400, "All fields are required")
     }
 
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [ {username}, {email}]
     })
 
     if(existedUser){
         throw new ApiError(409, "User with this email or username already exists")
     }
+
+    // console.log("req.files:", req.files);
 
     const avatarLocalPath = req.files?.avatar[0]?.path
     const coverImageLocalPath = req.files?.coverImage[0]?.path
@@ -49,14 +51,14 @@ const registerUser = asyncHandler( async (req,res) =>{
     }
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
-    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath) 
 
-    if(!avatar || !coverImage){
+    if( !avatar  || !coverImage ){
                 throw new ApiError(500, "Error uploading files to cloudinary")
  }
 
  const user = await User.create({
-    fullName,
+    fullname,
     username : username.toLowerCase(),
     email,  
     password,
@@ -66,7 +68,7 @@ const registerUser = asyncHandler( async (req,res) =>{
  })
 
  const createdUser = await User.findById(user._id).select(
-    " -password -refreshToken"
+    " -password  -refreshToken "
  )
 
  if(!createdUser){
